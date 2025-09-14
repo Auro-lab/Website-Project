@@ -1,28 +1,2 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="{{ url_for('static', filename='myDesign.css') }}">
-<title>Reading Quest</title>
-</head>
-<body class="landing-unique">
-<nav>
-    <a href="{{ url_for('login') }}">Login</a>
-    <a href="{{ url_for('about') }}">About</a>
-</nav>
 
-<section class="landing-container">
-    <div class="landing-left">
-    <h1>📚 Reading Quest</h1>
-    <p>Turn reading into an adventure!
-        Earn points, unlock levels, and boost your comprehension skills.</p>
-    <a href="{{ url_for('login') }}" class="start-btn">🎮 Begin Your Quest</a>
-    </div>
-    <div class="landing-right">
-        <img src="{{ url_for('static', filename='reading_avatar.png') }}" alt="" class="avatar">
-    </div>
-</section>
-
-</body>
-</html>
