@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='myDesign.css') }}">
+</head>
+<body class="dashboard">
+
+    <div class="avatar-frame">
+        {{ username[0]|upper }}
+    </div>
+
+    
+    <h2 class="welcome-text">Welcome, {{ username }}!</h2>
+
+    
+    <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+    <a href="{{ url_for('logout') }}" class="delete-btn">Delete Account</a>
+
+
+
+</body>
+</html>
