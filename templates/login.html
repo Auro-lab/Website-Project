@@ -10,16 +10,7 @@
     <div class="auth-box">
         <h2>Login</h2>
 
-        <!-- Flash messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                        <div class="flash {{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
+       
 
         <form method="POST" autocomplete="off">
             <input type="text" name="user_name" placeholder="Enter Username" autocomplete="off" required /><br />

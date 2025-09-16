@@ -3,42 +3,58 @@ import mysql.connector
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from flask_mail import Mail, Message
+from datetime import datetime, timedelta
+import os
+import secrets
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
-
+# Initialize Flask app
 app = Flask(__name__)
-app.secret_key = "ss123"
 
+# Use environment variables for better security
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "ss123")  # Default value if not found
+
+# Flask mail configuration (use environment variables for security)
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
     MAIL_USE_TLS=True,
-    MAIL_USERNAME='laes.monsale.ui@phinmaed.com',
-    MAIL_PASSWORD='hwavwpnxbdmfcqcb',  # <-- add this comma
-    MAIL_DEFAULT_SENDER='laes.monsale.ui@phinmaed.com',
+    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
+    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
+    MAIL_DEFAULT_SENDER=os.getenv("MAIL_DEFAULT_SENDER"),
 )
 mail = Mail(app)
 
-
-serializer = URLSafeTimedSerializer(app.secret_key)
-
-
+# Database connection using environment variables
 db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="Blue4Star!9",
-    database="users_db"
+    host=os.getenv("DB_HOST", "localhost"),
+    user=os.getenv("DB_USER", "root"),
+    password=os.getenv("DB_PASSWORD"),
+    database=os.getenv("DB_NAME")
 )
-
 cursor = db.cursor()
 
+# Initialize the serializer once with the app's secret key
+serializer = URLSafeTimedSerializer(app.secret_key)
 
-@app.route('/')
-def home():
-    return render_template("landing2.html")
+# Function to generate a random verification token
+def generate_verification_token():
+    return secrets.token_hex(16)  # More secure random token generation
 
+# Function to send verification email
+def send_verification_email(email, token):
+    verification_url = url_for('verify_email', token=token, _external=True)
+    msg = Message('Email Verification', recipients=[email])
+    msg.body = f"Please verify your email by clicking the following link: {verification_url}"
+    try:
+        mail.send(msg)
+    except Exception as e:
+        print(f"Error sending email: {e}")
 
-    #**********************Log in route************************* #
+# Routes (login, signup, etc.) go here...
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -46,20 +62,27 @@ def login():
         password = request.form.get("user_pass")
 
         cursor = db.cursor()
-        cursor.execute("SELECT password, is_verified FROM users WHERE username = %s", (username,))
+        cursor.execute("SELECT password, is_verified, verification_token_expires FROM users WHERE username = %s", (username,))
         result = cursor.fetchone()
         cursor.close()
 
         if result:
-            hashed_password, is_verified = result
+            hashed_password, is_verified, verification_token_expires = result
+
             if check_password_hash(hashed_password, password):
                 if is_verified:
                     session['username'] = username
                     flash("Logged in successfully!", "success")
                     return redirect(url_for('dashboard'))  # or 'successful' if that’s your route
                 else:
-                    flash("Please verify your email before logging in.", "warning")
-                    return redirect(url_for('login'))
+                    if datetime.utcnow() > verification_token_expires:
+                        cursor.execute("UPDATE users SET verification_token = NULL WHERE username = %s", (username,))
+                        db.commit()
+                        flash("Your verification link has expired. Please request a new one.", "warning")
+                        return redirect(url_for('resend_verification'))
+                    else:
+                        flash("Please verify your email before logging in.", "warning")
+                        return redirect(url_for('login'))
             else:
                 flash("Invalid username or password.", "error")
                 return redirect(url_for('login'))
@@ -69,104 +92,47 @@ def login():
 
     return render_template("login.html")
 
-
-
-      #**********************sign up route************************* #
-from werkzeug.security import generate_password_hash
-from flask import flash, redirect, render_template, request, url_for
-import re
-def is_strong_password(password):
-    if len(password) < 8:
-        return False
-    if not re.search(r"[A-Z]", password):
-        return False
-    if not re.search(r"\d", password):
-        return False
-    return True
-
-@app.route('/signup', methods=['GET', 'POST'])
-def signup():
+# Resend verification logic
+@app.route('/resend_verification', methods=['GET', 'POST'])
+def resend_verification():
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        confirm_password = request.form.get('confirm_password', '')
-
-        if password != confirm_password:
-            flash("Passwords do not match.", "error")
-            return redirect(url_for('signup'))
-
-        if not is_strong_password(password):
-            flash("Password is too weak. It must be at least 8 characters, include an uppercase letter and a number.", "error")
-            return redirect(url_for('signup'))
-
+        email = request.form['email']
         cursor = db.cursor()
-
-        # Check if email already exists
         cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
-        existing_user_email = cursor.fetchone()
+        user = cursor.fetchone()
 
-        # Check if username already exists
-        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
-        existing_user_username = cursor.fetchone()
+        if user:
+            if user['is_verified']:
+                flash("Your account is already verified!", "success")
+                return redirect(url_for('login'))
 
-        if existing_user_email:
-            flash("Email already registered. Please log in.", "error")
-            return redirect(url_for("login"))
-        if existing_user_username:
-            flash("Username already taken. Please choose another.", "error")
-            return redirect(url_for("signup"))
+            # Clear any old token and expiration time
+            cursor.execute("UPDATE users SET verification_token = NULL, verification_token_expires = NULL WHERE email = %s", (email,))
+            db.commit()
 
-        # Hash password before storing
-        hashed_password = generate_password_hash(password)
+            # Generate a new token and set expiration
+            new_token = generate_verification_token()  # Create a new token
+            expiration_time = datetime.utcnow() + timedelta(hours=24)
 
-        # Insert user into DB with is_verified defaulting to 0
-        cursor.execute(
-            "INSERT INTO users (username, email, password) VALUES (%s, %s, %s)",
-            (username, email, hashed_password)
-        )
-        db.commit()
-        cursor.close()
+            cursor.execute("""
+                UPDATE users
+                SET verification_token = %s, verification_token_expires = %s
+                WHERE email = %s
+            """, (new_token, expiration_time, email))
+            db.commit()
 
-        # ---------------- Email Verification ----------------
-        try:
-            token = serializer.dumps(email, salt='email-confirm')
-            confirm_url = url_for('confirm_email', token=token, _external=True)
+            send_verification_email(user['email'], new_token)  # send email
 
-            html = f"""
-            <html>
-            <body>
-                <p>Hi <strong>{username}</strong>,</p>
-                <p>Thanks for registering!</p>
-                <p>Please click the link below to verify your email address:</p>
-                <p><a href="{confirm_url}">Verify Email</a></p>
-                <br>
-                <p>If you did not request this, just ignore this email.</p>
-            </body>
-            </html>
-            """
+            flash("A new verification email has been sent.", "success")
+            return redirect(url_for('login'))
 
-            msg = Message("Please confirm your email", recipients=[email], html=html)
-            mail.send(msg)
-            print("✅ Verification email sent to:", email)
-        except Exception as e:
-            print("❌ Failed to send email:", str(e))
-            flash("Error sending confirmation email. Please try again.", "error")
-            return redirect(url_for("signup"))
-        # -----------------------------------------------------
+        else:
+            flash("No user found with this email address.", "error")
+            return redirect(url_for('resend_verification'))
 
-        flash("Registration successful! Please check your email to verify your account.", "success")
-        return redirect(url_for("login"))
+    return render_template('resend_verification.html')
 
-    return render_template("signup.html")
-
-
-
-   #*********************email confirmation*************************#
-
-# Initialize serializer somewhere in your app setup (only once)
-serializer = URLSafeTimedSerializer(app.secret_key)
-
+# Email confirmation logic
 @app.route('/confirm/<token>')
 def confirm_email(token):
     try:
@@ -197,61 +163,4 @@ def confirm_email(token):
     flash('Your account has been verified! You can now log in.', 'success')
     return redirect(url_for('login'))
 
-        
-
-
-#**********************successful html************************* #
-@app.route('/successful')
-def successful():
-    return render_template("successful.html")
-
-
-#**********************dashboard route************************* #
-@app.route('/dashboard')
-def dashboard():
-    if 'username' in session:
-        return render_template("dashboard.html", username=session['username'])
-    else:
-        return redirect(url_for('login'))
-    
-    
-    
-@app.route('/logout')
-def logout():
-    session.pop('username', None)
-    return redirect(url_for('home'))
-
-@app.route('/delete_account', methods=['POST'])
-def delete_account():
-    if 'username' in session:
-        username = session['username']
-        
-        
-
-        conn = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="Photosynthesis123",  
-            database="users_db"
-        )
-        cursor = conn.cursor()
-
-        
-        cursor.execute("DELETE FROM students WHERE user_name = %s", (username,))
-        conn.commit()
-
-        cursor.close()
-        conn.close()
-        
-        session.pop('username', None)
-
-        return redirect(url_for('home'))  # back to landing
-    else:
-        return redirect(url_for('login'))
-
-
-
-
-
-if __name__ == '__main__':
-    app.run(debug=True)
+# Signup logic and other routes follow...
