@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Locked in</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='myDesign.css') }}">
+</head>
+<body>
+  <header class="navbar">
+    <div class="logo">
+      <span class="book-icon">📖</span>
+      <h1>Locked in</h1>
+    </div>
+    <!-- changes this area this should be directed to  signup.html not log in-->
+    <a href="{{ url_for('signup') }}">Sign in</a>
+  </header>
+
+  <section class="hero">
+    <img src="bakuman.jpg" alt="LockedIn" class="hero-img">
+    <h2>Improve Your Reading</h2>
+    <p>Build confidence with simple, interactive reading lessons designed for every skill level</p>
+    <button class="start-btn">Start Learning Today</button>
+  </section>
+
+  <section class="levels">
+    <h2>Choose Your Level</h2>
+    <div class="cards">
+      <div class="card beginner">
+        <h3>Beginner</h3>
+        <p>Simple stories with basic vocabulary. Perfect for building confidence.</p>
+        <span>Progress 0/2 lessons</span>
+        <button>Start Learning</button>
+      </div>
+      <div class="card intermediate">
+        <h3>Intermediate</h3>
+        <p>More complex passages with detailed comprehension questions.</p>
+        <span>Progress 0/1 lessons</span>
+        <button>Start Learning</button>
+      </div>
+      <div class="card advanced">
+        <h3>Advanced</h3>
+        <p>Challenging texts that develop critical thinking skills.</p>
+        <span>Progress 0/1 lessons</span>
+        <button>Start Learning</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="why">
+    <h2>Why Choose Locked In?</h2>
+    <div class="features">
+      <div class="feature">
+        <div class="icon green">📖</div>
+        <h3>Simple & Clear</h3>
+        <p>Large text, clear instructions, and easy navigation for all reading levels.</p>
+      </div>
+      <div class="feature">
+        <div class="icon yellow">📖</div>
+        <h3>Progressive Learning</h3>
+        <p>Start where you're comfortable and advance at your own pace.</p>
+      </div>
+      <div class="feature">
+        <div class="icon purple">📖</div>
+        <h3>Track Progress</h3>
+        <p>See your improvement with clear progress tracking and feedback.</p>
+      </div>
+    </div>
+  </section>
+</body>
+</html>
